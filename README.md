@@ -49,6 +49,28 @@ Zmiany:
 
 - `/ban-eh` ma teraz parametr `appeal` (Tak/Nie) ustawiający pole „Możliwość odwołania”.
 
+### Migracja na nowe konto Railway bez utraty danych
+
+Bot umie przy pierwszym starcie na pustym `Volume` skopiowac dane z pliku seed.
+
+Przed wrzuceniem na nowe repo:
+
+1. skopiuj obecny `config.json` do `config.seed.json`
+2. jesli chcesz zachowac tez backup serwera, skopiuj `server-backup.json` do `server-backup.seed.json`
+3. wrzuc te pliki razem z kodem na nowe prywatne repo GitHub
+4. na nowym Railway podepnij `Volume`
+5. zdeployuj projekt
+
+Przy pierwszym starcie:
+- jesli `Volume` jest pusty, bot skopiuje dane z `config.seed.json`
+- i opcjonalnie `server-backup.seed.json`
+
+Po sprawdzeniu, ze wszystko dziala, najlepiej usun pliki:
+- `config.seed.json`
+- `server-backup.seed.json`
+
+i zrob kolejny deploy.
+
 
 ### Skargi na administrację
 - Ustaw kanał: `/skargikanal kanal:#kanał` (admin).

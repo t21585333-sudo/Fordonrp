@@ -12,6 +12,7 @@ const BACKUP_OWNER_ID = '1378291577973379117';
 const DISPLAY_TIME_ZONE = process.env.DISPLAY_TIME_ZONE || 'Europe/Warsaw';
 const DEFAULT_AUDIT_WEBHOOK_SOURCE_CHANNEL_ID = '1493613781694025959';
 const DEFAULT_AUDIT_LOG_TARGET_CHANNEL_ID = '1493614265909776625';
+const APP_DIR = process.cwd();
 
 const client = new Client({
   intents: [
@@ -26,11 +27,23 @@ if (!fs.existsSync(DATA_DIR)) {
 }
 const CONFIG_PATH = path.join(DATA_DIR, 'config.json');
 const BACKUP_PATH = path.join(DATA_DIR, 'server-backup.json');
+const CONFIG_SEED_PATH = path.join(APP_DIR, 'config.seed.json');
+const BACKUP_SEED_PATH = path.join(APP_DIR, 'server-backup.seed.json');
 let guildConfig = {};
 const tempChannels = new Map(); // channelId -> { ownerId, banned:Set<string> }
 
+function bootstrapSeededConfig() {
+  if (!fs.existsSync(CONFIG_PATH) && fs.existsSync(CONFIG_SEED_PATH)) {
+    fs.copyFileSync(CONFIG_SEED_PATH, CONFIG_PATH);
+  }
+  if (!fs.existsSync(BACKUP_PATH) && fs.existsSync(BACKUP_SEED_PATH)) {
+    fs.copyFileSync(BACKUP_SEED_PATH, BACKUP_PATH);
+  }
+}
+
 function loadConfig() { try { guildConfig = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8')); } catch { guildConfig = {}; } }
 function saveConfig() { fs.writeFileSync(CONFIG_PATH, JSON.stringify(guildConfig, null, 2), 'utf8'); }
+bootstrapSeededConfig();
 loadConfig();
 
 function ensureGuild(gid) {
