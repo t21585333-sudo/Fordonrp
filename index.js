@@ -106,6 +106,17 @@ function deleteTempMeta(gid, channelId) {
   saveConfig();
 }
 
+function resetGuildConfig(guild) {
+  if (!guild?.id) return;
+  delete guildConfig[guild.id];
+  if (guild?.channels?.cache) {
+    for (const channelId of guild.channels.cache.keys()) {
+      tempChannels.delete(channelId);
+    }
+  }
+  saveConfig();
+}
+
 async function safeReply(interaction, payload) {
   try {
     if (interaction.replied || interaction.deferred) {
@@ -598,6 +609,7 @@ const commands = [
   ]},
   { name: 'saveserver', description: 'Zapisz backup struktury serwera' },
   { name: 'backup', description: 'Przywróć zapisany backup struktury serwera' },
+  { name: 'resetcache', description: 'Resetuje zapisana konfiguracje bota dla tego serwera', default_member_permissions: PermissionFlagsBits.Administrator.toString() },
   { name: 'stworzkanalwybierz', description: 'Wybierz kanał-szablon do auto-tworzenia prywatnych kanałów', default_member_permissions: PermissionFlagsBits.Administrator.toString(), options: [
     { name: 'kanal', description: 'Kanał wejściowy (1 osoba)', type: 7, required: true }
   ]},
@@ -875,6 +887,19 @@ client.on('interactionCreate', async (interaction) => {
       await interaction.deferReply({ flags: 64 });
       const snapshot = await restoreServerSnapshot(interaction.guild);
       await interaction.editReply(`✅ Przywrócono backup z ${snapshot.savedAt}. Odtworzono strukturę ${snapshot.guildName}.`);
+      return;
+    }
+
+    if (interaction.commandName === 'resetcache') {
+      if (!interaction.member.permissions?.has(PermissionFlagsBits.Administrator) && !isBackupOwner(interaction.user)) {
+        await safeReply(interaction, { content: '⛔ Tę komendę może używać tylko Administrator.', flags: 64 });
+        return;
+      }
+      resetGuildConfig(interaction.guild);
+      await safeReply(interaction, {
+        content: '✅ Pamięć bota dla tego serwera została zresetowana. Kanały, permisje i ustawienia trzeba ustawić od nowa.',
+        flags: 64
+      });
       return;
     }
 
