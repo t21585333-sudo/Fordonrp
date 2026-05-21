@@ -64,6 +64,8 @@ function ensureGuild(gid) {
   g.tempVoiceTemplateId = g.tempVoiceTemplateId ?? null;
   g.channelRoleIds = Array.isArray(g.channelRoleIds) ? g.channelRoleIds : [];
   g.banRoleIds = Array.isArray(g.banRoleIds) ? g.banRoleIds : [];
+  g.banDcRoleIds = Array.isArray(g.banDcRoleIds) ? g.banDcRoleIds : [...g.banRoleIds];
+  g.banEhRoleIds = Array.isArray(g.banEhRoleIds) ? g.banEhRoleIds : [...g.banRoleIds];
   g.muteRoleIds = Array.isArray(g.muteRoleIds) ? g.muteRoleIds : [];
   g.muteUserIds = Array.isArray(g.muteUserIds) ? g.muteUserIds : [];
   g.idRoleIds = Array.isArray(g.idRoleIds) ? g.idRoleIds : [];
@@ -246,7 +248,8 @@ function isCommandVisible(member, cfg, commandName) {
   if (['configbaneh', 'ustawkanaldonickow', 'skargikanal', 'pochwalakanal', 'karydckanal', 'blacklistchannel', 'unbanchannel'].includes(commandName)) {
     return hasAllowedRole(member, cfg.channelRoleIds);
   }
-  if (['ban-eh', 'ban-dc'].includes(commandName)) return hasAllowedRole(member, cfg.banRoleIds);
+  if (commandName === 'ban-eh') return hasAllowedRole(member, cfg.banEhRoleIds);
+  if (commandName === 'ban-dc') return hasAllowedRole(member, cfg.banDcRoleIds);
   if (commandName === 'mute') return hasAllowedEntity(member, cfg.muteRoleIds, cfg.muteUserIds);
   if (commandName === 'unbandc') return hasAllowedRole(member, cfg.unbanDcRoleIds);
   if (commandName === 'unmutedc') return hasAllowedRole(member, cfg.unmuteRoleIds);
@@ -522,12 +525,16 @@ const commands = [
     { name: 'komu', description: 'Komu daje', type: 6, required: true },
     { name: 'dlaczego', description: 'Dlaczego', type: 3, required: true }
   ]},
-  { name: 'karyperrmison', description: 'Dodaj/usuń rolę do ban-eh/ban-dc', options: [
-    { name: 'rola', description: 'Rola', type: 8, required: true },
-    { name: 'akcja', description: 'add/remove', type: 3, required: true,
-      choices: [{ name: 'dodaj', value: 'add' }, { name: 'usuń', value: 'remove' }] }
+  { name: 'bandcperrmision', description: 'Lista lub nadanie permisji do ban DC', options: [
+    { name: 'akcja', description: 'list/dodaj/usun', type: 3, required: true,
+      choices: [{ name: 'list', value: 'list' }, { name: 'dodaj', value: 'dodaj' }, { name: 'usun', value: 'usun' }] },
+    { name: 'rola', description: 'Rola do ban DC', type: 8, required: false }
   ]},
-  { name: 'karyperrmisonlist', description: 'Lista ról kary (ban-eh/ban-dc)' },
+  { name: 'banehperrmision', description: 'Lista lub nadanie permisji do ban EH', options: [
+    { name: 'akcja', description: 'list/dodaj/usun', type: 3, required: true,
+      choices: [{ name: 'list', value: 'list' }, { name: 'dodaj', value: 'dodaj' }, { name: 'usun', value: 'usun' }] },
+    { name: 'rola', description: 'Rola do ban EH', type: 8, required: false }
+  ]},
   { name: 'muteperrmison', description: 'Lista lub nadanie permisji do mute', options: [
     { name: 'akcja', description: 'list/dodaj/usun', type: 3, required: true,
       choices: [{ name: 'list', value: 'list' }, { name: 'dodaj', value: 'dodaj' }, { name: 'usun', value: 'usun' }] },
@@ -1013,27 +1020,27 @@ client.on('interactionCreate', async (interaction) => {
       return;
     }
 
-    // role kary
-    if (interaction.commandName === 'karyperrmison') {
+    if (interaction.commandName === 'bandcperrmision' || interaction.commandName === 'banehperrmision') {
       if (!interaction.member.permissions?.has(PermissionFlagsBits.Administrator)) {
-        await interaction.reply({ content: '⛔ Tylko Admin może zarządzać uprawnieniami kary.', flags: 64 });
+        await interaction.reply({ content: '⛔ Tylko Admin może zarządzać tą permisją.', flags: 64 });
         return;
       }
-      const role = interaction.options.getRole('rola', true);
       const action = interaction.options.getString('akcja', true);
-      if (action === 'add') {
-        if (!cfg.banRoleIds.includes(role.id)) cfg.banRoleIds.push(role.id);
-        await interaction.reply({ content: `✅ Dodano <@&${role.id}> do ban-eh/ban-dc.`, flags: 64 });
-      } else {
-        cfg.banRoleIds = cfg.banRoleIds.filter(id => id !== role.id);
-        await interaction.reply({ content: `✅ Usunięto <@&${role.id}> z ban-eh/ban-dc.`, flags: 64 });
+      const role = interaction.options.getRole('rola');
+      const targetIds = interaction.commandName === 'bandcperrmision' ? cfg.banDcRoleIds : cfg.banEhRoleIds;
+      const label = interaction.commandName === 'bandcperrmision' ? 'ban DC' : 'ban EH';
+      if (action === 'list') {
+        const list = targetIds.length ? targetIds.map(id => `<@&${id}>`).join(', ') : `Brak ról do ${label}.`;
+        await interaction.reply({ content: list, flags: 64 });
+        return;
       }
+      if (!role) {
+        await interaction.reply({ content: '⚠️ Podaj rolę.', flags: 64 });
+        return;
+      }
+      updatePermissionEntries(targetIds, role.id, action);
       saveConfig();
-      return;
-    }
-    if (interaction.commandName === 'karyperrmisonlist') {
-      const list = cfg.banRoleIds.length ? cfg.banRoleIds.map(id => `<@&${id}>`).join(', ') : 'Brak ról do ban-eh/ban-dc.';
-      await interaction.reply({ content: list, flags: 64 });
+      await interaction.reply({ content: `✅ Zaktualizowano permisję ${label} dla <@&${role.id}>.`, flags: 64 });
       return;
     }
 
@@ -1499,7 +1506,7 @@ client.on('interactionCreate', async (interaction) => {
     if (interaction.commandName === 'ban-dc') {
       if (!cfg.dcCommandChannelId || !cfg.dcLogChannelId) { await interaction.reply({ content: '⚠️ Ustaw kanały: /karydckanal', flags: 64 }); return; }
       if (interaction.channelId !== cfg.dcCommandChannelId) { await interaction.reply({ content: `🔒 /ban-dc tylko w <#${cfg.dcCommandChannelId}>.`, flags: 64 }); return; }
-      if (!hasAllowedRole(interaction.member, cfg.banRoleIds)) { await interaction.reply({ content: '⛔ Brak uprawnień do /ban-dc.', flags: 64 }); return; }
+      if (!hasAllowedRole(interaction.member, cfg.banDcRoleIds)) { await interaction.reply({ content: '⛔ Brak uprawnień do /ban-dc.', flags: 64 }); return; }
       const targetUser = interaction.options.getUser('uzytkownik', true);
       const reason = interaction.options.getString('reason', true);
       const daysInput = interaction.options.getString('days', true);
@@ -1632,7 +1639,7 @@ client.on('interactionCreate', async (interaction) => {
     if (interaction.commandName === 'ban-eh') {
       if (!cfg.commandChannelId || !cfg.logChannelId) { await interaction.reply({ content: '⚠️ Ustaw kanały: /configBanEH', flags: 64 }); return; }
       if (interaction.channelId !== cfg.commandChannelId) { await interaction.reply({ content: `🔒 /ban-eh tylko w <#${cfg.commandChannelId}>.`, flags: 64 }); return; }
-      if (!hasAllowedRole(interaction.member, cfg.banRoleIds)) { await interaction.reply({ content: '⛔ Brak uprawnień do /ban-eh.', flags: 64 }); return; }
+      if (!hasAllowedRole(interaction.member, cfg.banEhRoleIds)) { await interaction.reply({ content: '⛔ Brak uprawnień do /ban-eh.', flags: 64 }); return; }
       const nick = interaction.options.getString('nick', true);
       const reason = interaction.options.getString('reason', true);
       const daysInput = interaction.options.getString('days', true);
