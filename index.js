@@ -66,6 +66,8 @@ function ensureGuild(gid) {
   g.banRoleIds = Array.isArray(g.banRoleIds) ? g.banRoleIds : [];
   g.muteRoleIds = Array.isArray(g.muteRoleIds) ? g.muteRoleIds : [];
   g.muteUserIds = Array.isArray(g.muteUserIds) ? g.muteUserIds : [];
+  g.idRoleIds = Array.isArray(g.idRoleIds) ? g.idRoleIds : [];
+  g.idUserIds = Array.isArray(g.idUserIds) ? g.idUserIds : [];
   g.unbanRoleIds = Array.isArray(g.unbanRoleIds) ? g.unbanRoleIds : [];
   g.blacklistRoleIds = Array.isArray(g.blacklistRoleIds) ? g.blacklistRoleIds : [];
   g.blacklistUserIds = Array.isArray(g.blacklistUserIds) ? g.blacklistUserIds : [];
@@ -239,6 +241,8 @@ function isCommandVisible(member, cfg, commandName) {
   if (['skarga', 'pochwala'].includes(commandName)) return true;
   if (['vc-name', 'vc-limit', 'vc-kick', 'vc-ban', 'vc-close'].includes(commandName)) return true;
   if (member.permissions?.has(PermissionFlagsBits.Administrator)) return true;
+  if (commandName === 'mute') return hasAllowedEntity(member, cfg.muteRoleIds, cfg.muteUserIds);
+  if (['idlist', 'idsearch'].includes(commandName)) return hasAllowedEntity(member, cfg.idRoleIds, cfg.idUserIds);
   const hasOff = member.roles.cache?.some(r => cfg.visibilityOffRoleIds.includes(r.id));
   if (hasOff) return false;
   if (cfg.visibilityOnRoleIds.length === 0) return false; // domyślnie zwykli widzą tylko /skarga
@@ -519,6 +523,12 @@ const commands = [
     { name: 'rola', description: 'Rola do mute', type: 8, required: false },
     { name: 'uzytkownik', description: 'Użytkownik do mute', type: 6, required: false }
   ]},
+  { name: 'idperrmision', description: 'Lista lub nadanie permisji do idlist/idsearch', options: [
+    { name: 'akcja', description: 'list/dodaj/usun', type: 3, required: true,
+      choices: [{ name: 'list', value: 'list' }, { name: 'dodaj', value: 'dodaj' }, { name: 'usun', value: 'usun' }] },
+    { name: 'rola', description: 'Rola do idlist/idsearch', type: 8, required: false },
+    { name: 'uzytkownik', description: 'Użytkownik do idlist/idsearch', type: 6, required: false }
+  ]},
   { name: 'unkaryperrmision', description: 'Dodaj/usuń rolę do unban/unmute', options: [
     { name: 'rola', description: 'Rola', type: 8, required: true },
     { name: 'akcja', description: 'add/remove', type: 3, required: true,
@@ -761,8 +771,8 @@ client.on('interactionCreate', async (interaction) => {
       return;
     }
 
-    if (['idlist','idsearch'].includes(interaction.commandName) && !interaction.member.permissions?.has(PermissionFlagsBits.Administrator)) {
-      await safeReply(interaction, { content: '⛔ Tę komendę może używać tylko Administrator.', flags: 64 });
+    if (['idlist','idsearch'].includes(interaction.commandName) && !hasAllowedEntity(interaction.member, cfg.idRoleIds, cfg.idUserIds)) {
+      await safeReply(interaction, { content: '⛔ Brak uprawnień do komend ID.', flags: 64 });
       return;
     }
 
@@ -1033,6 +1043,30 @@ client.on('interactionCreate', async (interaction) => {
       saveConfig();
       const changed = [role ? `<@&${role.id}>` : null, user ? `<@${user.id}>` : null].filter(Boolean).join(', ');
       await interaction.reply({ content: `✅ Zaktualizowano permisję mute dla: ${changed}`, flags: 64 });
+      return;
+    }
+
+    if (interaction.commandName === 'idperrmision') {
+      if (!interaction.member.permissions?.has(PermissionFlagsBits.Administrator)) {
+        await interaction.reply({ content: '⛔ Tylko Admin może zarządzać permisją do komend ID.', flags: 64 });
+        return;
+      }
+      const action = interaction.options.getString('akcja', true);
+      const role = interaction.options.getRole('rola');
+      const user = interaction.options.getUser('uzytkownik');
+      if (action === 'list') {
+        await interaction.reply({ content: formatPermissionList(cfg.idRoleIds, cfg.idUserIds), flags: 64 });
+        return;
+      }
+      if (!role && !user) {
+        await interaction.reply({ content: '⚠️ Podaj rolę lub użytkownika.', flags: 64 });
+        return;
+      }
+      if (role) updatePermissionEntries(cfg.idRoleIds, role.id, action);
+      if (user) updatePermissionEntries(cfg.idUserIds, user.id, action);
+      saveConfig();
+      const changed = [role ? `<@&${role.id}>` : null, user ? `<@${user.id}>` : null].filter(Boolean).join(', ');
+      await interaction.reply({ content: `✅ Zaktualizowano permisję komend ID dla: ${changed}`, flags: 64 });
       return;
     }
 
