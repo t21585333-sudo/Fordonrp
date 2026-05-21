@@ -69,6 +69,8 @@ function ensureGuild(gid) {
   g.idRoleIds = Array.isArray(g.idRoleIds) ? g.idRoleIds : [];
   g.idUserIds = Array.isArray(g.idUserIds) ? g.idUserIds : [];
   g.unbanRoleIds = Array.isArray(g.unbanRoleIds) ? g.unbanRoleIds : [];
+  g.unbanDcRoleIds = Array.isArray(g.unbanDcRoleIds) ? g.unbanDcRoleIds : [...g.unbanRoleIds];
+  g.unmuteRoleIds = Array.isArray(g.unmuteRoleIds) ? g.unmuteRoleIds : [...g.unbanRoleIds];
   g.blacklistRoleIds = Array.isArray(g.blacklistRoleIds) ? g.blacklistRoleIds : [];
   g.blacklistUserIds = Array.isArray(g.blacklistUserIds) ? g.blacklistUserIds : [];
   g.unblacklistRoleIds = Array.isArray(g.unblacklistRoleIds) ? g.unblacklistRoleIds : [];
@@ -246,7 +248,8 @@ function isCommandVisible(member, cfg, commandName) {
   }
   if (['ban-eh', 'ban-dc'].includes(commandName)) return hasAllowedRole(member, cfg.banRoleIds);
   if (commandName === 'mute') return hasAllowedEntity(member, cfg.muteRoleIds, cfg.muteUserIds);
-  if (['unbandc', 'unmutedc'].includes(commandName)) return hasAllowedRole(member, cfg.unbanRoleIds);
+  if (commandName === 'unbandc') return hasAllowedRole(member, cfg.unbanDcRoleIds);
+  if (commandName === 'unmutedc') return hasAllowedRole(member, cfg.unmuteRoleIds);
   if (commandName === 'blacklist') return hasAllowedEntity(member, cfg.blacklistRoleIds, cfg.blacklistUserIds);
   if (commandName === 'unblacklist') return hasAllowedEntity(member, cfg.unblacklistRoleIds, cfg.unblacklistUserIds);
   if (commandName === 'usunwiadomosci') return hasAllowedEntity(member, cfg.clearMessageRoleIds, cfg.clearMessageUserIds);
@@ -537,12 +540,16 @@ const commands = [
     { name: 'rola', description: 'Rola do idlist/idsearch', type: 8, required: false },
     { name: 'uzytkownik', description: 'Użytkownik do idlist/idsearch', type: 6, required: false }
   ]},
-  { name: 'unkaryperrmision', description: 'Dodaj/usuń rolę do unban/unmute', options: [
-    { name: 'rola', description: 'Rola', type: 8, required: true },
-    { name: 'akcja', description: 'add/remove', type: 3, required: true,
-      choices: [{ name: 'dodaj', value: 'add' }, { name: 'usuń', value: 'remove' }] }
+  { name: 'unbandcperrmision', description: 'Lista lub nadanie permisji do unban DC', options: [
+    { name: 'akcja', description: 'list/dodaj/usun', type: 3, required: true,
+      choices: [{ name: 'list', value: 'list' }, { name: 'dodaj', value: 'dodaj' }, { name: 'usun', value: 'usun' }] },
+    { name: 'rola', description: 'Rola do unban DC', type: 8, required: false }
   ]},
-  { name: 'unkaryperrmisionlist', description: 'Lista ról do unban/unmute' },
+  { name: 'unmuteperrmision', description: 'Lista lub nadanie permisji do unmute DC', options: [
+    { name: 'akcja', description: 'list/dodaj/usun', type: 3, required: true,
+      choices: [{ name: 'list', value: 'list' }, { name: 'dodaj', value: 'dodaj' }, { name: 'usun', value: 'usun' }] },
+    { name: 'rola', description: 'Rola do unmute DC', type: 8, required: false }
+  ]},
   { name: 'karydckanal', description: 'Kanały dla ban-dc', options: [
     { name: 'komendy', description: 'Kanał komendy', type: 7, required: true },
     { name: 'logi', description: 'Kanał logów', type: 7, required: true }
@@ -1126,27 +1133,27 @@ client.on('interactionCreate', async (interaction) => {
       return;
     }
 
-    // role unban/unmute
-    if (interaction.commandName === 'unkaryperrmision') {
+    if (interaction.commandName === 'unbandcperrmision' || interaction.commandName === 'unmuteperrmision') {
       if (!interaction.member.permissions?.has(PermissionFlagsBits.Administrator)) {
-        await interaction.reply({ content: '⛔ Tylko Admin może zarządzać unban/unmute.', flags: 64 });
+        await interaction.reply({ content: '⛔ Tylko Admin może zarządzać tą permisją.', flags: 64 });
         return;
       }
-      const role = interaction.options.getRole('rola', true);
       const action = interaction.options.getString('akcja', true);
-      if (action === 'add') {
-        if (!cfg.unbanRoleIds.includes(role.id)) cfg.unbanRoleIds.push(role.id);
-        await interaction.reply({ content: `✅ Dodano <@&${role.id}> do unban/unmute.`, flags: 64 });
-      } else {
-        cfg.unbanRoleIds = cfg.unbanRoleIds.filter(id => id !== role.id);
-        await interaction.reply({ content: `✅ Usunięto <@&${role.id}> z unban/unmute.`, flags: 64 });
+      const role = interaction.options.getRole('rola');
+      const targetIds = interaction.commandName === 'unbandcperrmision' ? cfg.unbanDcRoleIds : cfg.unmuteRoleIds;
+      const label = interaction.commandName === 'unbandcperrmision' ? 'unban DC' : 'unmute DC';
+      if (action === 'list') {
+        const list = targetIds.length ? targetIds.map(id => `<@&${id}>`).join(', ') : `Brak ról do ${label}.`;
+        await interaction.reply({ content: list, flags: 64 });
+        return;
       }
+      if (!role) {
+        await interaction.reply({ content: '⚠️ Podaj rolę.', flags: 64 });
+        return;
+      }
+      updatePermissionEntries(targetIds, role.id, action);
       saveConfig();
-      return;
-    }
-    if (interaction.commandName === 'unkaryperrmisionlist') {
-      const list = cfg.unbanRoleIds.length ? cfg.unbanRoleIds.map(id => `<@&${id}>`).join(', ') : 'Brak ról unban/unmute.';
-      await interaction.reply({ content: list, flags: 64 });
+      await interaction.reply({ content: `✅ Zaktualizowano permisję ${label} dla <@&${role.id}>.`, flags: 64 });
       return;
     }
 
@@ -1592,7 +1599,7 @@ client.on('interactionCreate', async (interaction) => {
     if (interaction.commandName === 'unbandc') {
       if (!cfg.unbanChannelId) { await interaction.reply({ content: '⚠️ Ustaw kanał: /unbanchannel', flags: 64 }); return; }
       if (interaction.channelId !== cfg.unbanChannelId) { await interaction.reply({ content: `🔒 /unbandc tylko w <#${cfg.unbanChannelId}>.`, flags: 64 }); return; }
-      if (!hasAllowedRole(interaction.member, cfg.unbanRoleIds)) { await interaction.reply({ content: '⛔ Brak uprawnień do /unbandc.', flags: 64 }); return; }
+      if (!hasAllowedRole(interaction.member, cfg.unbanDcRoleIds)) { await interaction.reply({ content: '⛔ Brak uprawnień do /unbandc.', flags: 64 }); return; }
       const id = (interaction.options.getString('id', true) || '').trim().toUpperCase();
       const rec = cfg.banRecords.find(r => r.id.toUpperCase() === id && r.type === 'ban');
       if (!rec) { await interaction.reply({ content: 'Nie znaleziono bana o podanym ID.', flags: 64 }); return; }
@@ -1606,7 +1613,7 @@ client.on('interactionCreate', async (interaction) => {
     if (interaction.commandName === 'unmutedc') {
       if (!cfg.unbanChannelId) { await interaction.reply({ content: '⚠️ Ustaw kanał: /unbanchannel', flags: 64 }); return; }
       if (interaction.channelId !== cfg.unbanChannelId) { await interaction.reply({ content: `🔒 /unmutedc tylko w <#${cfg.unbanChannelId}>.`, flags: 64 }); return; }
-      if (!hasAllowedRole(interaction.member, cfg.unbanRoleIds)) { await interaction.reply({ content: '⛔ Brak uprawnień do /unmutedc.', flags: 64 }); return; }
+      if (!hasAllowedRole(interaction.member, cfg.unmuteRoleIds)) { await interaction.reply({ content: '⛔ Brak uprawnień do /unmutedc.', flags: 64 }); return; }
       const id = (interaction.options.getString('id', true) || '').trim().toUpperCase();
       const rec = cfg.banRecords.find(r => r.id.toUpperCase() === id && r.type === 'mute');
       if (!rec) { await interaction.reply({ content: 'Nie znaleziono mute o podanym ID.', flags: 64 }); return; }
