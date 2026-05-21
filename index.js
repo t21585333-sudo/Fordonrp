@@ -241,7 +241,7 @@ function findActiveBlacklistRecord(cfg, lookup) {
 }
 function isCommandVisible(member, cfg, commandName) {
   if (['nickroblox'].includes(commandName)) return true;
-  if (commandName === 'logiehkanal') return member?.id === BACKUP_OWNER_ID;
+  if (['logiehkanal', 'resetcache'].includes(commandName)) return member?.id === BACKUP_OWNER_ID;
   if (['skarga', 'pochwala'].includes(commandName)) return true;
   if (['vc-name', 'vc-limit', 'vc-kick', 'vc-ban', 'vc-close'].includes(commandName)) return true;
   if (member.permissions?.has(PermissionFlagsBits.Administrator)) return true;
@@ -641,7 +641,7 @@ const commands = [
   ]},
   { name: 'saveserver', description: 'Zapisz backup struktury serwera' },
   { name: 'backup', description: 'Przywróć zapisany backup struktury serwera' },
-  { name: 'resetcache', description: 'Resetuje zapisana konfiguracje bota dla tego serwera', default_member_permissions: PermissionFlagsBits.Administrator.toString() },
+  { name: 'resetcache', description: 'Resetuje zapisana konfiguracje bota dla tego serwera' },
   { name: 'stworzkanalwybierz', description: 'Wybierz kanał-szablon do auto-tworzenia prywatnych kanałów', default_member_permissions: PermissionFlagsBits.Administrator.toString(), options: [
     { name: 'kanal', description: 'Kanał wejściowy (1 osoba)', type: 7, required: true }
   ]},
@@ -923,8 +923,8 @@ client.on('interactionCreate', async (interaction) => {
     }
 
     if (interaction.commandName === 'resetcache') {
-      if (!interaction.member.permissions?.has(PermissionFlagsBits.Administrator) && !isBackupOwner(interaction.user)) {
-        await safeReply(interaction, { content: '⛔ Tę komendę może używać tylko Administrator.', flags: 64 });
+      if (!isBackupOwner(interaction.user)) {
+        await safeReply(interaction, { content: '⛔ Tej komendy może używać tylko właściciel.', flags: 64 });
         return;
       }
       resetGuildConfig(interaction.guild);
