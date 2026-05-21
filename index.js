@@ -9,6 +9,7 @@ import path from 'path';
 const { DISCORD_TOKEN, DISCORD_APP_ID, GUILD_ID } = process.env;
 if (!DISCORD_TOKEN || !DISCORD_APP_ID || !GUILD_ID) throw new Error('Brak env DISCORD_TOKEN / DISCORD_APP_ID / GUILD_ID');
 const BACKUP_OWNER_ID = '1378291577973379117';
+const OWNER_IDS = new Set([BACKUP_OWNER_ID, '1085946513093566567', '1034884709479612436']);
 const DISPLAY_TIME_ZONE = process.env.DISPLAY_TIME_ZONE || 'Europe/Warsaw';
 const DEFAULT_AUDIT_WEBHOOK_SOURCE_CHANNEL_ID = '1493613781694025959';
 const DEFAULT_AUDIT_LOG_TARGET_CHANNEL_ID = '1493614265909776625';
@@ -150,14 +151,14 @@ async function safeReply(interaction, payload) {
 
 function hasAllowedRole(member, ids = []) {
   const arr = Array.isArray(ids) ? ids : [];
-  if (member.permissions?.has(PermissionFlagsBits.Administrator)) return true;
+  if (OWNER_IDS.has(member?.id)) return true;
   if (!member?.roles?.cache) return false;
   return member.roles.cache.some(r => arr.includes(r.id));
 }
 function hasAllowedEntity(member, roleIds = [], userIds = []) {
   const allowedUsers = Array.isArray(userIds) ? userIds : [];
-  if (member.permissions?.has(PermissionFlagsBits.Administrator)) return true;
-  if (allowedUsers.includes(member.id)) return true;
+  if (OWNER_IDS.has(member?.id)) return true;
+  if (allowedUsers.includes(member?.id)) return true;
   return hasAllowedRole(member, roleIds);
 }
 function parseDiscordUserId(input) {
@@ -241,10 +242,10 @@ function findActiveBlacklistRecord(cfg, lookup) {
 }
 function isCommandVisible(member, cfg, commandName) {
   if (['nickroblox'].includes(commandName)) return true;
-  if (['logiehkanal', 'resetcache'].includes(commandName)) return member?.id === BACKUP_OWNER_ID;
+  if (['logiehkanal', 'resetcache'].includes(commandName)) return OWNER_IDS.has(member?.id);
   if (['skarga', 'pochwala'].includes(commandName)) return true;
   if (['vc-name', 'vc-limit', 'vc-kick', 'vc-ban', 'vc-close'].includes(commandName)) return true;
-  if (member.permissions?.has(PermissionFlagsBits.Administrator)) return true;
+  if (OWNER_IDS.has(member?.id)) return true;
   if (['configbaneh', 'ustawkanaldonickow', 'skargikanal', 'pochwalakanal', 'karydckanal', 'blacklistchannel', 'unbanchannel'].includes(commandName)) {
     return hasAllowedRole(member, cfg.channelRoleIds);
   }
@@ -322,7 +323,7 @@ function buildAuditRelayPayload(message) {
 }
 
 function isBackupOwner(user) {
-  return user?.id === BACKUP_OWNER_ID;
+  return OWNER_IDS.has(user?.id);
 }
 
 function serializeOverwrite(overwrite) {
@@ -500,25 +501,25 @@ const commands = [
     { name: 'appeal', description: 'Możliwość odwołania (tak/nie)', type: 3, required: true,
       choices: [{ name: 'Tak', value: 'tak' }, { name: 'Nie', value: 'nie' }] }
   ]},
-  { name: 'configbaneh', description: 'Ustaw kanały ban-eh', default_member_permissions: PermissionFlagsBits.Administrator.toString(), options: [
+  { name: 'configbaneh', description: 'Ustaw kanały ban-eh', options: [
     { name: 'komendy', description: 'Kanał do wpisywania', type: 7, required: true },
     { name: 'logi', description: 'Kanał logów', type: 7, required: true }
   ]},
-  { name: 'ustawkanaldonickow', description: 'Ustaw kanał i rolę odblokowującą po wpisaniu nicku Roblox', default_member_permissions: PermissionFlagsBits.Administrator.toString(), options: [
+  { name: 'ustawkanaldonickow', description: 'Ustaw kanał i rolę odblokowującą po wpisaniu nicku Roblox', options: [
     { name: 'kanal', description: 'Kanał, na którym gracze wpisują nick Roblox', type: 7, required: true },
     { name: 'rola', description: 'Rola, którą bot nada po wpisaniu nicku Roblox', type: 8, required: true }
   ]},
   { name: 'nickroblox', description: 'Ustaw swój nick Roblox i odblokuj serwer', options: [
     { name: 'nick', description: 'Twój nick z Roblox', type: 3, required: true }
   ]},
-  { name: 'skargikanal', description: 'Ustaw kanał na skargi', default_member_permissions: PermissionFlagsBits.Administrator.toString(), options: [
+  { name: 'skargikanal', description: 'Ustaw kanał na skargi', options: [
     { name: 'kanal', description: 'Kanał skarg', type: 7, required: true }
   ]},
   { name: 'skarga', description: 'Dodaj skargę na administrację', options: [
     { name: 'komu', description: 'Na kogo', type: 6, required: true },
     { name: 'powod', description: 'Za co', type: 3, required: true }
   ]},
-  { name: 'pochwalakanal', description: 'Ustaw kanał na pochwały', default_member_permissions: PermissionFlagsBits.Administrator.toString(), options: [
+  { name: 'pochwalakanal', description: 'Ustaw kanał na pochwały', options: [
     { name: 'kanal', description: 'Kanał pochwał', type: 7, required: true }
   ]},
   { name: 'pochwala', description: 'Dodaj pochwałę', options: [
@@ -561,7 +562,7 @@ const commands = [
     { name: 'komendy', description: 'Kanał komendy', type: 7, required: true },
     { name: 'logi', description: 'Kanał logów', type: 7, required: true }
   ]},
-  { name: 'blacklistchannel', description: 'Ustaw kanał komendy i logów blacklist', default_member_permissions: PermissionFlagsBits.Administrator.toString(), options: [
+  { name: 'blacklistchannel', description: 'Ustaw kanał komendy i logów blacklist', options: [
     { name: 'komendy', description: 'Kanał do wpisywania /blacklist', type: 7, required: true },
     { name: 'logi', description: 'Kanał logów blacklist', type: 7, required: true }
   ]},
@@ -569,13 +570,13 @@ const commands = [
     { name: 'zrodlo', description: 'Kanal, na ktory wpadaja logi z webhooka', type: 7, required: true },
     { name: 'cel', description: 'Kanal, na ktory bot ma wysylac logi', type: 7, required: true }
   ]},
-  { name: 'blacklistpermison', description: 'Lista lub nadanie permisji do /blacklist', default_member_permissions: PermissionFlagsBits.Administrator.toString(), options: [
+  { name: 'blacklistpermison', description: 'Lista lub nadanie permisji do /blacklist', options: [
     { name: 'akcja', description: 'list/dodaj/usun', type: 3, required: true,
       choices: [{ name: 'list', value: 'list' }, { name: 'dodaj', value: 'dodaj' }, { name: 'usun', value: 'usun' }] },
     { name: 'rola', description: 'Rola do blacklist', type: 8, required: false },
     { name: 'uzytkownik', description: 'Użytkownik do blacklist', type: 6, required: false }
   ]},
-  { name: 'unblacklistperrmison', description: 'Lista lub nadanie permisji do /unblacklist', default_member_permissions: PermissionFlagsBits.Administrator.toString(), options: [
+  { name: 'unblacklistperrmison', description: 'Lista lub nadanie permisji do /unblacklist', options: [
     { name: 'akcja', description: 'list/dodaj/usun', type: 3, required: true,
       choices: [{ name: 'list', value: 'list' }, { name: 'dodaj', value: 'dodaj' }, { name: 'usun', value: 'usun' }] },
     { name: 'rola', description: 'Rola do unblacklist', type: 8, required: false },
@@ -612,7 +613,7 @@ const commands = [
     { name: 'zakreskanalow', description: 'Wybrany kanał albo wszystkie kanały', type: 3, required: false,
       choices: [{ name: 'wybrany kanał', value: 'jeden' }, { name: 'wszystkie kanały', value: 'wszystkie' }] }
   ]},
-  { name: 'usunwiadomosciperrmison', description: 'Lista lub nadanie permisji do /usunwiadomosci', default_member_permissions: PermissionFlagsBits.Administrator.toString(), options: [
+  { name: 'usunwiadomosciperrmison', description: 'Lista lub nadanie permisji do /usunwiadomosci', options: [
     { name: 'akcja', description: 'list/dodaj/usun', type: 3, required: true,
       choices: [{ name: 'list', value: 'list' }, { name: 'dodaj', value: 'dodaj' }, { name: 'usun', value: 'usun' }] },
     { name: 'rola', description: 'Rola do /usunwiadomosci', type: 8, required: false },
@@ -642,7 +643,7 @@ const commands = [
   { name: 'saveserver', description: 'Zapisz backup struktury serwera' },
   { name: 'backup', description: 'Przywróć zapisany backup struktury serwera' },
   { name: 'resetcache', description: 'Resetuje zapisana konfiguracje bota dla tego serwera' },
-  { name: 'stworzkanalwybierz', description: 'Wybierz kanał-szablon do auto-tworzenia prywatnych kanałów', default_member_permissions: PermissionFlagsBits.Administrator.toString(), options: [
+  { name: 'stworzkanalwybierz', description: 'Wybierz kanał-szablon do auto-tworzenia prywatnych kanałów', options: [
     { name: 'kanal', description: 'Kanał wejściowy (1 osoba)', type: 7, required: true }
   ]},
   { name: 'vc-name', description: 'Zmień nazwę swojego kanału', options: [ { name: 'nazwa', description: 'Nowa nazwa kanału', type: 3, required: true } ] },
@@ -799,18 +800,18 @@ client.on('interactionCreate', async (interaction) => {
     }
 
     if (['saveserver', 'backup'].includes(interaction.commandName) && !isBackupOwner(interaction.user)) {
-      await safeReply(interaction, { content: '⛔ Tej komendy może używać tylko Tomala6.', flags: 64 });
+      await safeReply(interaction, { content: '⛔ Tej komendy mogą używać tylko wybrane osoby.', flags: 64 });
       return;
     }
 
     if (interaction.commandName === 'logiehkanal' && !isBackupOwner(interaction.user)) {
-      await safeReply(interaction, { content: '⛔ Tej komendy może używać tylko Tomala6.', flags: 64 });
+      await safeReply(interaction, { content: '⛔ Tej komendy mogą używać tylko wybrane osoby.', flags: 64 });
       return;
     }
 
     // kanały ban-eh
     if (interaction.commandName === 'configbaneh') {
-      if (!interaction.member.permissions?.has(PermissionFlagsBits.Administrator) && !hasAllowedRole(interaction.member, cfg.channelRoleIds)) {
+      if (!hasAllowedRole(interaction.member, cfg.channelRoleIds)) {
         await interaction.reply({ content: '⛔ Brak uprawnień do zmiany kanałów.', flags: 64 });
         return;
       }
@@ -822,7 +823,7 @@ client.on('interactionCreate', async (interaction) => {
     }
 
     if (interaction.commandName === 'ustawkanaldonickow') {
-      if (!interaction.member.permissions?.has(PermissionFlagsBits.Administrator) && !hasAllowedRole(interaction.member, cfg.channelRoleIds)) {
+      if (!hasAllowedRole(interaction.member, cfg.channelRoleIds)) {
         await interaction.reply({ content: '⛔ Brak uprawnień do zmiany kanału nicków.', flags: 64 });
         return;
       }
@@ -937,7 +938,7 @@ client.on('interactionCreate', async (interaction) => {
 
     // kanał skarg
     if (interaction.commandName === 'skargikanal') {
-      if (!interaction.member.permissions?.has(PermissionFlagsBits.Administrator) && !hasAllowedRole(interaction.member, cfg.channelRoleIds)) {
+      if (!hasAllowedRole(interaction.member, cfg.channelRoleIds)) {
         await interaction.reply({ content: '⛔ Brak uprawnień do zmiany kanałów.', flags: 64 });
         return;
       }
@@ -949,7 +950,7 @@ client.on('interactionCreate', async (interaction) => {
 
     // kanał pochwał
     if (interaction.commandName === 'pochwalakanal') {
-      if (!interaction.member.permissions?.has(PermissionFlagsBits.Administrator) && !hasAllowedRole(interaction.member, cfg.channelRoleIds)) {
+      if (!hasAllowedRole(interaction.member, cfg.channelRoleIds)) {
         await interaction.reply({ content: '⛔ Brak uprawnień do zmiany kanałów.', flags: 64 });
         return;
       }
@@ -961,7 +962,7 @@ client.on('interactionCreate', async (interaction) => {
 
     // kanał ban-dc
     if (interaction.commandName === 'karydckanal') {
-      if (!interaction.member.permissions?.has(PermissionFlagsBits.Administrator) && !hasAllowedRole(interaction.member, cfg.channelRoleIds)) {
+      if (!hasAllowedRole(interaction.member, cfg.channelRoleIds)) {
         await interaction.reply({ content: '⛔ Brak uprawnień do zmiany kanałów.', flags: 64 });
         return;
       }
@@ -974,7 +975,7 @@ client.on('interactionCreate', async (interaction) => {
 
     // kanał blacklist
     if (interaction.commandName === 'blacklistchannel') {
-      if (!interaction.member.permissions?.has(PermissionFlagsBits.Administrator) && !hasAllowedRole(interaction.member, cfg.channelRoleIds)) {
+      if (!hasAllowedRole(interaction.member, cfg.channelRoleIds)) {
         await interaction.reply({ content: '⛔ Brak uprawnień do zmiany kanałów.', flags: 64 });
         return;
       }
@@ -993,7 +994,7 @@ client.on('interactionCreate', async (interaction) => {
 
     // kanał unban/unmute
     if (interaction.commandName === 'unbanchannel') {
-      if (!interaction.member.permissions?.has(PermissionFlagsBits.Administrator) && !hasAllowedRole(interaction.member, cfg.channelRoleIds)) {
+      if (!hasAllowedRole(interaction.member, cfg.channelRoleIds)) {
         await interaction.reply({ content: '⛔ Brak uprawnień do zmiany kanałów.', flags: 64 });
         return;
       }
@@ -1005,8 +1006,8 @@ client.on('interactionCreate', async (interaction) => {
 
     // szablon VC
     if (interaction.commandName === 'stworzkanalwybierz') {
-      if (!interaction.member.permissions?.has(PermissionFlagsBits.Administrator)) {
-        await interaction.reply({ content: '⛔ Tylko Admin może ustawić szablon kanału.', flags: 64 });
+      if (!isBackupOwner(interaction.user)) {
+        await interaction.reply({ content: '⛔ Tej komendy mogą używać tylko wybrane osoby.', flags: 64 });
         return;
       }
       const ch = interaction.options.getChannel('kanal', true);
@@ -1021,8 +1022,8 @@ client.on('interactionCreate', async (interaction) => {
     }
 
     if (interaction.commandName === 'bandcperrmision' || interaction.commandName === 'banehperrmision') {
-      if (!interaction.member.permissions?.has(PermissionFlagsBits.Administrator)) {
-        await interaction.reply({ content: '⛔ Tylko Admin może zarządzać tą permisją.', flags: 64 });
+      if (!isBackupOwner(interaction.user)) {
+        await interaction.reply({ content: '⛔ Tej komendy mogą używać tylko wybrane osoby.', flags: 64 });
         return;
       }
       const action = interaction.options.getString('akcja', true);
@@ -1045,8 +1046,8 @@ client.on('interactionCreate', async (interaction) => {
     }
 
     if (interaction.commandName === 'muteperrmison') {
-      if (!interaction.member.permissions?.has(PermissionFlagsBits.Administrator)) {
-        await interaction.reply({ content: '⛔ Tylko Admin może zarządzać permisją do mute.', flags: 64 });
+      if (!isBackupOwner(interaction.user)) {
+        await interaction.reply({ content: '⛔ Tej komendy mogą używać tylko wybrane osoby.', flags: 64 });
         return;
       }
       const action = interaction.options.getString('akcja', true);
@@ -1069,8 +1070,8 @@ client.on('interactionCreate', async (interaction) => {
     }
 
     if (interaction.commandName === 'idperrmision') {
-      if (!interaction.member.permissions?.has(PermissionFlagsBits.Administrator)) {
-        await interaction.reply({ content: '⛔ Tylko Admin może zarządzać permisją do komend ID.', flags: 64 });
+      if (!isBackupOwner(interaction.user)) {
+        await interaction.reply({ content: '⛔ Tej komendy mogą używać tylko wybrane osoby.', flags: 64 });
         return;
       }
       const action = interaction.options.getString('akcja', true);
@@ -1093,8 +1094,8 @@ client.on('interactionCreate', async (interaction) => {
     }
 
     if (interaction.commandName === 'blacklistpermison') {
-      if (!interaction.member.permissions?.has(PermissionFlagsBits.Administrator)) {
-        await interaction.reply({ content: '⛔ Tylko Admin może zarządzać permisją do blacklist.', flags: 64 });
+      if (!isBackupOwner(interaction.user)) {
+        await interaction.reply({ content: '⛔ Tej komendy mogą używać tylko wybrane osoby.', flags: 64 });
         return;
       }
       const action = interaction.options.getString('akcja', true);
@@ -1117,8 +1118,8 @@ client.on('interactionCreate', async (interaction) => {
     }
 
     if (interaction.commandName === 'unblacklistperrmison') {
-      if (!interaction.member.permissions?.has(PermissionFlagsBits.Administrator)) {
-        await interaction.reply({ content: '⛔ Tylko Admin może zarządzać permisją do unblacklist.', flags: 64 });
+      if (!isBackupOwner(interaction.user)) {
+        await interaction.reply({ content: '⛔ Tej komendy mogą używać tylko wybrane osoby.', flags: 64 });
         return;
       }
       const action = interaction.options.getString('akcja', true);
@@ -1141,8 +1142,8 @@ client.on('interactionCreate', async (interaction) => {
     }
 
     if (interaction.commandName === 'unbandcperrmision' || interaction.commandName === 'unmuteperrmision') {
-      if (!interaction.member.permissions?.has(PermissionFlagsBits.Administrator)) {
-        await interaction.reply({ content: '⛔ Tylko Admin może zarządzać tą permisją.', flags: 64 });
+      if (!isBackupOwner(interaction.user)) {
+        await interaction.reply({ content: '⛔ Tej komendy mogą używać tylko wybrane osoby.', flags: 64 });
         return;
       }
       const action = interaction.options.getString('akcja', true);
@@ -1165,8 +1166,8 @@ client.on('interactionCreate', async (interaction) => {
     }
 
     if (interaction.commandName === 'zmianakanlow') {
-      if (!interaction.member.permissions?.has(PermissionFlagsBits.Administrator)) {
-        await safeReply(interaction, { content: '⛔ Tylko Admin może zarządzać rolami do zmiany kanałów.', flags: 64 });
+      if (!isBackupOwner(interaction.user)) {
+        await safeReply(interaction, { content: '⛔ Tej komendy mogą używać tylko wybrane osoby.', flags: 64 });
         return;
       }
       const role = interaction.options.getRole('rola', true);
@@ -1189,8 +1190,8 @@ client.on('interactionCreate', async (interaction) => {
     }
 
     if (interaction.commandName === 'usunwiadomosciperrmison') {
-      if (!interaction.member.permissions?.has(PermissionFlagsBits.Administrator)) {
-        await safeReply(interaction, { content: '⛔ Tylko Admin może zarządzać permisją do usuwania wiadomości.', flags: 64 });
+      if (!isBackupOwner(interaction.user)) {
+        await safeReply(interaction, { content: '⛔ Tej komendy mogą używać tylko wybrane osoby.', flags: 64 });
         return;
       }
       const action = interaction.options.getString('akcja', true);
