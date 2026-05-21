@@ -241,7 +241,15 @@ function isCommandVisible(member, cfg, commandName) {
   if (['skarga', 'pochwala'].includes(commandName)) return true;
   if (['vc-name', 'vc-limit', 'vc-kick', 'vc-ban', 'vc-close'].includes(commandName)) return true;
   if (member.permissions?.has(PermissionFlagsBits.Administrator)) return true;
+  if (['configbaneh', 'ustawkanaldonickow', 'skargikanal', 'pochwalakanal', 'karydckanal', 'blacklistchannel', 'unbanchannel'].includes(commandName)) {
+    return hasAllowedRole(member, cfg.channelRoleIds);
+  }
+  if (['ban-eh', 'ban-dc'].includes(commandName)) return hasAllowedRole(member, cfg.banRoleIds);
   if (commandName === 'mute') return hasAllowedEntity(member, cfg.muteRoleIds, cfg.muteUserIds);
+  if (['unbandc', 'unmutedc'].includes(commandName)) return hasAllowedRole(member, cfg.unbanRoleIds);
+  if (commandName === 'blacklist') return hasAllowedEntity(member, cfg.blacklistRoleIds, cfg.blacklistUserIds);
+  if (commandName === 'unblacklist') return hasAllowedEntity(member, cfg.unblacklistRoleIds, cfg.unblacklistUserIds);
+  if (commandName === 'usunwiadomosci') return hasAllowedEntity(member, cfg.clearMessageRoleIds, cfg.clearMessageUserIds);
   if (['idlist', 'idsearch'].includes(commandName)) return hasAllowedEntity(member, cfg.idRoleIds, cfg.idUserIds);
   const hasOff = member.roles.cache?.some(r => cfg.visibilityOffRoleIds.includes(r.id));
   if (hasOff) return false;
